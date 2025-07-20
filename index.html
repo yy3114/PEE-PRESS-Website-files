@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Pee Press 互動式報紙</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* 自定義字體 */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Merriweather:400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e0e0e0; /* 略深的灰色背景 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px; /* 身體邊距，為報紙容器留空間 */
+            box-sizing: border-box;
+        }
+        .newspaper-container {
+            background-color: #fcf8e8; /* 略帶黃色的米白紙張顏色 */
+            border: 1px solid #c0c0c0; /* 淺灰色邊框 */
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15); /* 更明顯的陰影 */
+            border-radius: 8px; /* 較小的圓角，更像報紙 */
+            overflow: hidden;
+            position: relative;
+            width: 100%;
+            max-width: 850px; /* 略寬一些 */
+            min-height: 80vh; /* 最小高度為視窗高度的80% */
+            max-height: 95vh; /* 最大高度為視窗高度的95%，確保頁碼可見 */
+            display: flex;
+            flex-direction: column;
+            cursor: grab; /* 鼠標顯示為可拖動 */
+        }
+        .newspaper-container:active {
+            cursor: grabbing; /* 鼠標顯示為正在拖動 */
+        }
+        .newspaper-page {
+            width: 100%;
+            height: 100%; /* 讓頁面填滿容器可用空間 */
+            padding: 28px 28px 45px 28px; /* 頁面內邊距，特別增加底部內邊距 */
+            box-sizing: border-box;
+            display: none;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow-y: auto; /* 允許內容滾動 */
+        }
+        .newspaper-page.active {
+            display: flex;
+        }
+        .header {
+            border-bottom: 3px solid #000; /* 更粗的標題下劃線 */
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            font-family: 'Merriweather', serif; /* 報紙標題字體 */
+            font-size: 2.5rem; /* 報紙標題縮小 */
+            font-weight: 900; /* 超粗體 */
+            color: #1a1a1a;
+            margin: 0;
+            line-height: 1;
+            text-transform: uppercase; /* 大寫 */
+            letter-spacing: -1px; /* 字距微調 */
+            white-space: nowrap; /* 確保在一行 */
+        }
+        .header .slogan {
+            font-family: 'Inter', sans-serif; /* 標語字體 */
+            font-size: 1.2rem; /* 標語大小 */
+            font-weight: 700;
+            color: #333;
+            margin-top: 8px; /* 與標題的間距 */
+            margin-bottom: 10px; /* 與日期的間距 */
+        }
+        .header p {
+            font-size: 0.95rem;
+            color: #555;
+            margin-top: 6px;
+            font-weight: 700; /* 日期也加粗 */
+        }
+        .content {
+            flex-grow: 1;
+            display: grid;
+            grid-template-columns: repeat(1, 1fr); /* 預設單欄 */
+            gap: 20px 25px; /* row-gap column-gap */
+            padding-bottom: 15px; /* 底部填充 */
+            border-top: 1px solid #ccc; /* 內容區塊頂部細線，模擬報紙分隔 */
+            padding-top: 15px; /* 與頂部細線的間距 */
+        }
+        @media (min-width: 400px) { /* 手機橫向或小平板開始兩欄 */
+            .content {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        @media (min-width: 640px) { /* 標準平板及以上三欄 */
+            .content {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        .newspaper-article {
+            padding-bottom: 15px; /* 底部填充，為分隔線留空間 */
+            border-bottom: 1px dashed #ccc; /* 虛線分隔 */
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0; /* 預設垂直分隔線 */
+            padding-right: 15px; /* 分隔線右側的內邊距 */
+        }
+        .newspaper-article:last-child {
+            border-bottom: none; /* 每欄最後一篇文章無分隔線 */
+        }
+
+        /* 移除單欄模式下的右側邊界 */
+        .content[style*="grid-template-columns: repeat(1"] .newspaper-article {
+            border-right: none;
+            padding-right: 0;
+        }
+
+        /* 兩欄模式下的右側邊界 */
+        @media (min-width: 400px) {
+            .content {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .newspaper-article {
+                border-right: 1px solid #e0e0e0; /* 預設垂直分隔線 */
+                padding-right: 15px;
+            }
+            .newspaper-article:nth-child(2n) { /* 每行的第二個文章，移除右側邊界 */
+                border-right: none;
+                padding-right: 0;
+            }
+        }
+
+        /* 三欄模式下的右側邊界 */
+        @media (min-width: 640px) {
+            .content {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .newspaper-article {
+                border-right: 1px solid #e0e0e0; /* 預設垂直分隔線 */
+                padding-right: 15px;
+            }
+            .newspaper-article:nth-child(3n) { /* 每行的第三個文章，移除右側邊界 */
+                border-right: none;
+                padding-right: 0;
+            }
+            /* 確保在三欄模式下，之前兩欄模式的規則不會錯誤地移除邊界 */
+            .newspaper-article:nth-child(2n):not(:nth-child(3n)) {
+                border-right: 1px solid #e0e0e0;
+                padding-right: 15px;
+            }
+        }
+
+
+        .newspaper-article h2, .newspaper-article h3 {
+            font-family: 'Merriweather', serif;
+            font-size: 1.3rem; /* 文章主標題 */
+            font-weight: 700;
+            color: #333;
+            margin-bottom: 5px;
+            line-height: 1.3;
+        }
+        .newspaper-article h3 {
+            font-size: 1.1rem; /* 小標題 */
+            font-weight: 700;
+            color: #444;
+            margin-top: 10px;
+        }
+        .newspaper-article p {
+            font-size: 0.9rem; /* 內文小一點 */
+            line-height: 1.5;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        .newspaper-article ul {
+            list-style: none; /* 移除預設列表點 */
+            padding-left: 0;
+            margin-bottom: 10px;
+        }
+        .newspaper-article ul li {
+            font-size: 0.9rem;
+            line-height: 1.5;
+            color: #444;
+            margin-bottom: 5px;
+        }
+        .red-text {
+            color: #e74c3c; /* 紅色 */
+            font-weight: 700; /* 加粗，讓紅色更醒目 */
+        }
+        .newspaper-article img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #555;
+            margin-top: 8px;
+            margin-bottom: 8px;
+            box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.08);
+            opacity: 1; /* 恢復完全不透明 */
+        }
+        .address-text {
+            font-size: 0.85rem; /* 地址文字小一點 */
+            color: #666;
+            margin-top: 5px;
+            line-height: 1.1; /* 縮小行間距 */
+        }
+        .feature-item {
+            margin-bottom: 8px; /* 每個特色項目之間的間距 */
+        }
+        .feature-item p {
+            margin-bottom: 2px; /* 縮小特色項目內段落間距 */
+        }
+        .feature-icon {
+            font-size: 1em; /* 圖標大小 */
+            margin-right: 5px;
+            color: #3498db; /* 藍色圖標 */
+        }
+
+        .page-indicator {
+            text-align: center;
+            padding: 15px 10px; /* 增加垂直內邊距 */
+            font-size: 0.95rem;
+            color: #666;
+            background-color: #f5f0d8; /* 頁碼區塊背景 */
+            border-top: 1px solid #e0d8c0;
+            border-bottom-left-radius: 8px;
+            border-bottom-right-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="newspaper-container">
+        <!-- 頁面 1 -->
+        <div id="page1" class="newspaper-page active">
+            <div class="header">
+                <h1>The Pee Press</h1>
+                <p class="slogan">1號通訊社宗旨：實現尿尿自由</p>
+                <p>2025年7月25日 - Taipee總部落成專刊</p>
+            </div>
+            <div class="content">
+                <div class="newspaper-article">
+                    <h2>《The Pee Press》官方介紹</h2>
+                    <p>創立於西元 69 年 4 月 20 日，《The Pee Press》原本是由一群古羅馬公共澡堂裡的思想家、尿液煉金術士與膀胱哲學家聯合創辦的祕密情報機構。據說創辦人之一「Pee-拉圖」曾留下經典名言： 「人類所有思想，都起源於尿急。」 最初，《The Pee Press》只是一份以羊皮紙＋尿液書寫的地下期刊，專門揭露帝國貴族的前列腺問題與尿道不正。到了中世紀，《The Pee Press》憑著一篇震撼世界的調查報導〈主教其實是夜尿王〉，一舉奪下「歐洲最不受歡迎媒體獎」，從此聲名大噪。</p>
+                    <img src='https://i.postimg.cc/h4829zC2/1000022228.jpg' alt=''>
+                </div>
+                <div class="newspaper-article">
+                    <h2>宗旨與使命</h2>
+                    <p>《The Pee Press》的存在意義只有一個——讓全人類<span class="red-text">尿得其所，笑得失禁，尿尿自由</span>。 我們堅信：</p>
+                    <ul>
+                        <li><span class="red-text">尿液是一種語言。</span></li>
+                        <li><span class="red-text">泌尿是一門哲學。</span></li>
+                        <li><span class="red-text">尿道，是通往真理的黃金之路。</span></li>
+                    </ul>
+                    <p>使命包括但不限於：</p>
+                    <ul>
+                        <li><span class="red-text">打擊尿道壓迫、捍衛頻尿自由</span></li>
+                        <li><span class="red-text">曝光全球尿義不公、揭露隱藏的膀胱真相</span></li>
+                        <li><span class="red-text">攝護腺大罷免、尿尿大成功</span></li>
+                        <li><span class="red-text">推動「情場失意、尿場得意」社會運動</span></li>
+                        <li><span class="red-text">為每一位尿意中人發聲</span></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁面 2 -->
+        <div id="page2" class="newspaper-page">
+            <div class="header">
+                <h1>The Pee Press</h1>
+                <p class="slogan">1號通訊社宗旨：實現尿尿自由</p>
+                <p>2025年7月25日 - Taipee總部落成專刊</p>
+            </div>
+            <div class="content">
+                <div class="newspaper-article">
+                    <h2>Taipee Tower 台P新總部全新落成</h2>
+                    <img src='https://i.postimg.cc/gjT9mx6F/1000022219.jpg' alt=''>
+                    <p class="address-text">📍 Taipee Tower｜台P塔總部地址</p>
+                    <p class="address-text">11088 台北市信義區尿流大道 168 號</p>
+                    <p class="address-text">No. 168, UroFlow Blvd., Xinyi District, Taipei 11088, Taiwan</p>
+
+                    <h3 class="feature-item"><span class="feature-icon">💎</span> 玻璃帷幕鑽石級尿建築</h3>
+                    <p>🌍 全球唯一獲得 UAD 鑽石級 認證的尿建築，不只科技與尿能共榮，<span class="red-text">整體外觀充滿高級感與未來感啦，與101呼應，成為世界級地標、尿建築界的 One World Trade Center。該建築師事務所更因此榮獲2025普嗤立刻獎奇葩類首獎的殊榮。</span></p>
+                    <h3 class="feature-item"><span class="feature-icon">🪟</span> 外觀特色：光流玻璃帷幕設計</h3>
+                    <p>採用 TSMX <span class="red-text">研發之智能反射尿能封裝強化玻璃(cowog)</span>，具備以下功能：</p>
+                    <ul>
+                        <li>根據陽光角度，反射出黃金拋物線狀光影</li>
+                        <li>智能變色，當尿壓全球升高時轉為淡金色警戒模式，晚間顯示流速動畫光帶，呈現即時全球膀胱負載熱圖。夜晚塔頂會出現「Pee 光柱」，象徵膀胱之道無所不流。</li>
+                    </ul>
+
+                    <h3 class="feature-item"><span class="feature-icon">🔬</span> 工程技術亮點：</h3>
+                    <ul>
+                        <li>GODICK Diu2 晶片驅動整棟建築能量系統</li>
+                        <li>尿能蒸散循環牆體：玻璃外層吸收環境濕氣＋人體熱尿流，供給空調與植栽系統使用。</li>
+                        <li>全塔無管線傳尿系統（FluidLift v9）：尿液由任意樓層可自然流向處理核心，不靠馬達、全靠重力設計。</li>
+                    </ul>
+
+                    <h3 class="feature-item"><span class="feature-icon">💬</span> 建築標語：</h3>
+                    <p>「流向未來，自由即尿」</p>
+                    <p>Taipee Tower — Where Every Drop Counts.</p>
+
+                    <h3 class="feature-item"><span class="feature-icon">🏅</span> 榮譽與用途：</h3>
+                    <ul>
+                        <li><span class="feature-icon">☑️</span> 全球尿流大會固定主場</li>
+                        <li><span class="feature-icon">☑️</span> Pee DAO 元宇宙登錄建築</li>
+                        <li><span class="feature-icon">☑️</span> 國際尿權法庭指定訴訟中心</li>
+                        <li><span class="feature-icon">☑️</span> 登入 Apple Maps 時會會顯示「黃金尿能地標」🌍</li>
+                    </ul>
+
+                </div>
+                <!-- Pee Coin 發行說明 已從此處移除 -->
+            </div>
+        </div>
+
+        <!-- 頁面 3 -->
+        <div id="page3" class="newspaper-page">
+            <div class="header">
+                <h1>The Pee Press</h1>
+                <p class="slogan">1號通訊社宗旨：實現尿尿自由</p>
+                <p>2025年7月25日 - Taipee總部落成專刊</p>
+            </div>
+            <div class="content">
+                <div class="newspaper-article">
+                    <h2>全球規模與據點</h2>
+                    <p>截至 2025 年，《The Pee Press》全球擁有員工 87,423 名，其中包含：</p>
+                    <ul>
+                        <li>122 位泌尿專欄記者</li>
+                        <li>987 位膀胱圖書館編輯</li>
+                        <li>6 位專職尿液占卜師</li>
+                        <li>1 名夜班守廁者（兼任咖啡師）</li>
+                    </ul>
+                    <p>全球分支遍佈六大洲、七大洋與<span class="red-text">兩顆不便透露的行星</span>，包括但不限於：</p>
+                    <ul>
+                        <li><span class="red-text">Taipee 台P總部</span>：<span class="red-text">黃金排尿帶的戰略核心</span>，設有「尿勢戰情室」與「全球尿流監測儀」，已發射 87 顆衛星即時監測全球尿況。</li>
+                        <li><span class="red-text">台P總部委託 TSMX 以 2 奈米與先進封裝技術生產人類史上第一顆專為尿尿自由而生的 AI 晶片，代號：GODICK Diu2。並派出旅行家 1 號與 2 號，探索宇宙中最先進的尿尿科技。</span></li>
+                    </ul>
+                </div>
+                <div class="newspaper-article">
+                    <img src='https://i.postimg.cc/pLgX8YJS/1000022252.jpg' alt=''>
+                    <h2>Pee 會員大會</h2>
+                    <p>《The Pee Press》將於 2025 年 9 月 31 日，在 Taipee Tower 台P總部隆重<span class="red-text">舉行870屆年度大會</span>。本次大會將同步發表多篇開創性尿流學論文，並首度發表<span class="red-text">GODICK Diu2先進晶片</span>、揭露多項尖端尿能科技產品，引領全球Pee科技進入新紀元。</p>
+                    <p>為因應全球尿勢波動，穩定排尿流速與膀胱壓力指數，會中更正式宣布發行全球第一枚泌尿專用穩定幣——Pee Coin（PEE 幣），致力打造一個流動、公平、且能回饋每一滴尿的去中心化金融生態系。</p>
+                    <h2>Pee Coin 發行說明</h2>
+                    <h3>幣值與規劃：</h3>
+                    <ul>
+                        <li>1 Pee Coin = 1 喝水者的膀胱自由</li>
+                        <li>初始發行量：<span class="red-text">81 億顆</span>（象徵全球人口皆可尿）</li>
+                        <li>採用 Proof of Stream 共識機制，透過連續排尿記錄驗證區塊</li>
+                        <li>符合 ERC-6969 協議，支援鏈上尿量統計與<span class="red-text">攝護腺預警通知</span></li>
+                    </ul>
+                    <h3>幣面設計特色：</h3>
+                    <p>中央為一滴正在排出的黃金尿液，象徵流動、自由與人性真實，幣緣刻有「Every Leak Tells a Story」口號。</p>
+                    <p>發行機構：Taipee 台P總部 PISS（Pee International Stabilization System）戰略委員會聯合監管。</p>
+                </div>
+                <div class="newspaper-article">
+                    <h2>未來展望</h2>
+                    <p>未來，《The Pee Press》將持續擴張版圖，目標於 2030 年於國際太空站設立「零重力排尿行為研究中心」，並<span class="red-text">致力推廣 Pee Coin 作為多星系泌尿交易標準貨幣。</span></p>
+                    <p><span class="red-text">與Elan Mask 合作開發尿能智能車與發展UrineCity，為人類未來發展盡一份心力。</span></p>
+                    <p>我們的終極願景是： 「哪裡有人類，哪裡就有尿，哪裡就有我們。」 —— The Pee Press®，Because every leak tells a story。</p>
+                </div>
+                <div class="newspaper-article w-full flex justify-center items-center">
+                    <img src="https://i.postimg.cc/MGXSHcBG/1752984906117.png" alt="[底部圖片]" class="max-w-xs w-1/2 mx-auto mt-4 mb-2 rounded-lg shadow-md">
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁碼指示器 -->
+        <div class="page-indicator">
+            <span id="currentPageNum">1</span> / <span id="totalPagesNum">3</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const pages = document.querySelectorAll('.newspaper-page');
+            const currentPageNumSpan = document.getElementById('currentPageNum');
+            const totalPagesNumSpan = document.getElementById('totalPagesNum');
+
+            let currentPageIndex = 0; // 當前頁面索引 (0-based)
+            const totalPages = pages.length;
+
+            // 初始化顯示頁面和頁碼
+            function showPage(index) {
+                pages.forEach((page, i) => {
+                    if (i === index) {
+                        page.classList.add('active');
+                    } else {
+                        page.classList.remove('active');
+                    }
+                });
+                currentPageNumSpan.textContent = index + 1; // 更新頁碼顯示
+            }
+
+            // 初始化頁碼總數
+            totalPagesNumSpan.textContent = totalPages;
+
+            // 處理觸控滑動事件 (也適用於鼠標拖動)
+            let touchStartX = 0;
+            let touchEndX = 0;
+            let isDragging = false; // 用於判斷是否正在拖動
+
+            const newspaperContainer = document.querySelector('.newspaper-container');
+
+            // 鼠標按下或觸控開始
+            newspaperContainer.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                touchStartX = e.screenX;
+                newspaperContainer.style.cursor = 'grabbing'; // 改變鼠標樣式
+            });
+            newspaperContainer.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                touchStartX = e.changedTouches[0].screenX;
+            });
+
+            // 鼠標鬆開或觸控結束
+            newspaperContainer.addEventListener('mouseup', (e) => {
+                if (isDragging) {
+                    touchEndX = e.screenX;
+                    handleSwipe();
+                    isDragging = false;
+                    newspaperContainer.style.cursor = 'grab'; // 恢復鼠標樣式
+                }
+            });
+            newspaperContainer.addEventListener('touchend', (e) => {
+                if (isDragging) {
+                    touchEndX = e.changedTouches[0].screenX;
+                    handleSwipe();
+                    isDragging = false;
+                }
+            });
+
+            // 鼠標移動 (用於防止在拖動時選中文字)
+            newspaperContainer.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    e.preventDefault(); // 防止選中文字
+                }
+            });
+
+            function handleSwipe() {
+                const swipeThreshold = 70; // 觸控/滑動距離閾值增加
+
+                if (touchEndX < touchStartX - swipeThreshold) {
+                    // 向左滑動 (下一頁)
+                    if (currentPageIndex < totalPages - 1) {
+                        currentPageIndex++;
+                        showPage(currentPageIndex);
+                    }
+                } else if (touchEndX > touchStartX + swipeThreshold) {
+                    // 向右滑動 (上一頁)
+                    if (currentPageIndex > 0) {
+                        currentPageIndex--;
+                        showPage(currentPageIndex);
+                    }
+                }
+            }
+
+            // 初始顯示第一頁
+            showPage(currentPageIndex);
+        });
+    </script>
+</body>
+</html>
+
